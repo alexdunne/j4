@@ -1,0 +1,74 @@
+---
+- name: Create a directory for the redis download
+  file:
+    path: "{{ redis_install_dir }}"
+    state: directory
+  become: true
+
+- name: Create a directory for the redis config
+  file:
+    path: "{{ redis_config_dir }}"
+    state: directory
+  become: true
+
+- name: Download and unarchive the redis installer
+  unarchive:
+    src: "{{ redis_download_url }}"
+    dest: "{{ redis_install_dir }}"
+    remote_src: yes
+  become: true
+
+- name: Copy redis conf
+  template:
+    src: redis.conf
+    dest: "{{ redis_config_dir }}/redis.conf"
+  become: true
+
+- name: Compile Redis binaries
+  make:
+    chdir: "{{ redis_install_dir }}/redis-stable"
+
+- name: Run Redis tests
+  make:
+    chdir: "{{ redis_install_dir }}/redis-stable"
+    target: test
+
+- name: Install Redis
+  make:
+    chdir: "{{ redis_install_dir }}/redis-stable"
+    target: install
+  become: yes
+
+- name: Create a redis user group
+  group:
+    name: "{{ redis_user }}"
+  become: yes
+
+- name: Create a redis user
+  user:
+    name: "{{ redis_user }}"
+    group: "{{ redis_user }}"
+    create_home: no
+  become: yes
+
+- name: Create a directory for redis to put logs
+  file:
+    path: "{{ redis_dir }}"
+    state: directory
+    owner: "{{ redis_user }}"
+    group: "{{ redis_user }}"
+    mode: 0770
+  become: yes
+
+- name: Copy systemd redis conf
+  template:
+    src: redis.service
+    dest: /etc/systemd/system/redis.service
+  become: true
+
+- name: Start redis service
+  systemd:
+    state: started
+    name: redis
+  become: yes
+

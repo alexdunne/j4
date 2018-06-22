@@ -1,0 +1,6 @@
+---
+redis_install_dir: /opt/redis
+redis_dir: /var/lib/redis
+redis_config_dir: /etc/redis
+redis_download_url: http://download.redis.io/redis-stable.tar.gz
+redis_user: redis

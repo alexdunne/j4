@@ -1,0 +1,19 @@
+---
+- name: Update apt
+  become: yes
+  apt: update_cache=yes
+
+- name: Upgrade apt
+  become: yes
+  apt: upgrade=yes
+
+- name: Install System Packages
+  become: yes
+  apt: pkg={{ item }} state=latest
+  with_items:
+    - curl
+    - wget
+    - libcurl4-openssl-dev
+    - build-essential
+    - git
+    - tcl
