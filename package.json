@@ -5,6 +5,8 @@
   "author": "Alex Dunne <hi@alexdunne.net>",
   "description": "A simple helpful robot for your Company",
   "dependencies": {
+    "date-fns": "^1.29.0",
+    "googleapis": "^27.0.0",
     "hubot": "^2.19.0",
     "hubot-diagnostics": "0.0.2",
     "hubot-help": "^0.2.2",
