@@ -10,3 +10,4 @@ node_modules
 # other
 .env
 client_secret.json
+j4-bot.json

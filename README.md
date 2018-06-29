@@ -14,4 +14,8 @@ To start J4 run `bin/hubot -a slack`. This will download any dependencies and st
 
 ### Google Calendar setup
 
-To get Google calendar setup you can follow this guide here https://developers.google.com/calendar/quickstart/nodejs.
+- Setup a service account for the j4 project https://console.developers.google.com/apis/credentials
+
+- Download the provided `json` config and rename it to `j4-bot.json`
+
+- Move the file into the root of the project

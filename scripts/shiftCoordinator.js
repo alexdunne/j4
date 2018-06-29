@@ -2,10 +2,6 @@
  Description:
    Add shifts to Google calendar and fetch a summary of the next week/month
 
- Dependencies:
-   "date-fns": "1.29.0"
-   "googleapis": "27.0.0"
-
  Commands:
    hubot show all shift hours - Shows the start and end times of all shift types
    hubot set day shift hours between (start) and (end) - Updates the day shift start and end times to the ones provided
@@ -18,6 +14,10 @@
 
 const format = require("date-fns/format");
 const parse = require("date-fns/parse");
+const addDays = require("date-fns/add_days");
+
+const botReporterAdapter = require("../lib/reporter/botReporterAdapter");
+const calendar = require("../lib/external-services/google/calendar");
 
 const SHIFT_TYPES = {
   DAY: 1,
@@ -25,17 +25,82 @@ const SHIFT_TYPES = {
   STUDY: 3
 };
 
-const getShiftTypeKeyPrefix = type => {
-  return `shift-coordinator:shift-type:${type}:times`;
+const getShiftTypeKeyPrefix = shiftType => {
+  return `shift-coordinator:shift-type:${shiftType}:times`;
 };
 
 module.exports = robot => {
-  const setShiftTypeHours = (type, start, end) => {
-    robot.brain.set(getShiftTypeKeyPrefix(type), { start, end });
+  const setShiftTypeHours = (shiftType, start, end) => {
+    robot.brain.set(getShiftTypeKeyPrefix(shiftType), {
+      start: {
+        hour: start.split(":")[0],
+        minute: start.split(":")[1]
+      },
+      end: {
+        hour: end.split(":")[0],
+        minute: end.split(":")[1]
+      }
+    });
   };
 
-  const getShiftTypeHours = type => {
-    return robot.brain.get(getShiftTypeKeyPrefix(type));
+  const getShiftTypeHours = shiftType => {
+    const hours = robot.brain.get(getShiftTypeKeyPrefix(shiftType));
+
+    if (!hours) {
+      throw new Error("This shift type does not have its hours set");
+    }
+
+    return hours;
+  };
+
+  const getShiftTypeEventSummary = shiftType => {
+    const typeToSummaryMap = {
+      [SHIFT_TYPES.DAY]: "Day shift",
+      [SHIFT_TYPES.NIGHT]: "Night shift",
+      [SHIFT_TYPES.STUDY]: "Study shift"
+    };
+
+    if (!typeToSummaryMap[shiftType]) {
+      throw new Error("Attempted to create an event for an unsupported type");
+    }
+
+    return typeToSummaryMap[shiftType];
+  };
+
+  const getEventDateTimesForShiftType = (date, shiftType) => {
+    const hours = getShiftTypeHours(shiftType);
+
+    let start = new Date(date);
+    let end = new Date(date);
+
+    start.setHours(hours.start.hour, hours.start.minute);
+    end.setHours(hours.end.hour, hours.end.hour);
+
+    if (shiftType === SHIFT_TYPES.NIGHT) {
+      end = addDays(end, 1);
+    }
+
+    return { start, end };
+  };
+
+  const addShiftRequest = async (res, shiftType) => {
+    try {
+      const parsedDate = parse(res.match[1]);
+      const dateTimes = getEventDateTimesForShiftType(parsedDate, shiftType);
+
+      const event = {
+        summary: getShiftTypeEventSummary(shiftType),
+        start: { dateTime: dateTimes.start, timeZone: process.env.HUBOT_TIMEZONE },
+        end: { dateTime: dateTimes.end, timeZone: process.env.HUBOT_TIMEZONE }
+      };
+
+      await calendar.createEvent(robot.brain, botReporterAdapter(res), event);
+
+      res.send(`Added a new day shift entry to your calendar ${format(parsedDate, "Do MMMM")}`);
+      res.send(`The shift begins at ${dateTimes.start} and ends at ${dateTimes.end}`);
+    } catch (err) {
+      res.send(`Something went wrong. ${err}`);
+    }
   };
 
   robot.respond(/show all shift hours/i, function(res) {
@@ -79,19 +144,14 @@ module.exports = robot => {
   });
 
   robot.respond(/add a day shift for (.*)/i, function(res) {
-    robot.emit("google:authenticate", res, function(err, oauth) {
-      console.log(err, oauth);
-      const parsedDate = parse(res.match[1]);
-
-      res.send(`Added a new day shift entry to your calendar ${format(parsedDate, "Do MMMM")}`);
-    });
+    addShiftRequest(res, SHIFT_TYPES.DAY);
   });
 
   robot.respond(/add a night shift for (.*)/i, function(res) {
-    console.log(res);
+    addShiftRequest(res, SHIFT_TYPES.NIGHT);
   });
 
   robot.respond(/add a study day for (.*)/i, function(res) {
-    console.log(res);
+    addShiftRequest(res, SHIFT_TYPES.STUDY);
   });
 };
